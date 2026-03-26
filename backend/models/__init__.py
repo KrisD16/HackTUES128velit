@@ -1,3 +1,3 @@
 from .user import User
-from .vendorInfo import vendor, product
+from .vendor_models import Vendor, Product
 from .status import status

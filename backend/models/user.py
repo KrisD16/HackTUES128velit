@@ -4,7 +4,16 @@ collection = db["users"]
 
 
 class User:
-    def __init__(self, id=None, username=None, email=None, password=None, created_at=None, location=None, phone=None):
+    def __init__(
+        self,
+        id=None,
+        username=None,
+        email=None,
+        password=None,
+        created_at=None,
+        location=None,
+        phone=None,
+    ):
         self.id = id
         self.username = username
         self.email = email
@@ -15,9 +24,10 @@ class User:
 
     def to_dict(self):
         return {
-            "id": str(self.id) if self.id else None,
+            "_id": str(self.id) if self.id else None,
             "username": self.username,
             "email": self.email,
+            "password": self.password,
             "created_at": str(self.created_at) if self.created_at else None,
             "location": self.location,
             "phone": self.phone,
