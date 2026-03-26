@@ -273,6 +273,32 @@ def create_product():
     ---
     tags:
       - Products
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - vendor_id
+            - name
+            - price
+          properties:
+            vendor_id:
+              type: string
+            name:
+              type: string
+            price:
+              type: number
+            description:
+              type: string
+    responses:
+      201:
+        description: Product created
+      400:
+        description: Missing required fields
+      404:
+        description: Vendor not found
     """
     data = request.get_json()
     if not data or not all(k in data for k in ("vendor_id", "name", "price")):
@@ -309,6 +335,26 @@ def create_vendor():
     ---
     tags:
       - Vendors
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - username
+          properties:
+            username:
+              type: string
+            email:
+              type: string
+            password:
+              type: string
+    responses:
+      201:
+        description: Vendor created
+      400:
+        description: Missing required fields
     """
     data = request.get_json()
     if not data or "username" not in data:
@@ -336,6 +382,33 @@ def add_vendor_product(vendor_id):
     ---
     tags:
       - Vendors
+    parameters:
+      - in: path
+        name: vendor_id
+        type: string
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - name
+            - price
+          properties:
+            name:
+              type: string
+            price:
+              type: number
+            description:
+              type: string
+    responses:
+      201:
+        description: Product added
+      400:
+        description: Missing required fields
+      404:
+        description: Vendor not found
     """
     data = request.get_json()
     if not data or not all(k in data for k in ("name", "price")):
