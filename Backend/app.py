@@ -1,6 +1,10 @@
 from flask import Flask, jsonify, request
 from flasgger import Swagger
-from models.user import User, collection as users_col
+from services.user_service import (
+    get_user_service,
+    list_users_service,
+    create_user_service,
+)
 from models.status import status as Status, statuses as statuses_col
 from services.vendor_service import (
     list_vendors,
@@ -76,10 +80,7 @@ def get_users():
               phone:
                 type: string
     """
-    docs = list(users_col.find())
-    for d in docs:
-        d["_id"] = str(d["_id"])
-    return jsonify(docs), 200
+    return jsonify(list_users_service()), 200
 
 
 @app.route("/users", methods=["POST"])
@@ -119,8 +120,9 @@ def create_user():
     data = request.get_json()
     if not data or not all(k in data for k in ("username", "email", "password")):
         return jsonify({"error": "username, email and password are required"}), 400
-    result = users_col.insert_one(data)
-    return jsonify({"id": str(result.inserted_id)}), 201
+
+    user_id = create_user_service(data)
+    return jsonify({"id": user_id}), 201
 
 
 @app.route("/users/<user_id>", methods=["GET"])
@@ -141,11 +143,10 @@ def get_user(user_id):
       404:
         description: User not found
     """
-    doc = users_col.find_one({"_id": ObjectId(user_id)})
-    if not doc:
+    user = get_user_service(user_id)
+    if not user:
         return jsonify({"error": "User not found"}), 404
-    doc["_id"] = str(doc["_id"])
-    return jsonify(doc), 200
+    return jsonify(user), 200
 
 
 # ── Statuses ───────────────────────────────────────────────────────────────
