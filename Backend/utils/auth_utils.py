@@ -1,6 +1,6 @@
 from functools import wraps
 from flask import request, jsonify
-import jwt
+from Backend.utils.jwt_utils import generate_token, SECRET_KEY
 
 
 def login_required(f):

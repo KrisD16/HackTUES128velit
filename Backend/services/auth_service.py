@@ -1,5 +1,6 @@
 from datetime import datetime
-from utils import hash_password, check_password, generate_token
+from utils.password_hashing import hash_password, check_password
+from utils.jwt_utils import generate_token
 from bson import ObjectId
 
 
