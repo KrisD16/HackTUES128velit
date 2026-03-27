@@ -21,8 +21,7 @@ class User:
 
     def to_dict(self):
         """Convert user object to dictionary"""
-        return {
-            "_id": str(self.id) if self.id else None,
+        data = {
             "username": self.username,
             "email": self.email,
             "password": self.password,
@@ -30,12 +29,18 @@ class User:
             "location": self.location,
             "phone": self.phone,
         }
+        if self.id is not None:
+            data["_id"] = str(self.id)
+        return data
 
     @staticmethod
     def from_dict(data):
         """Create user object from dictionary"""
+        raw_id = data.get("_id")
+        if raw_id is not None:
+            raw_id = str(raw_id)
         return User(
-            id=data.get("_id"),
+            id=raw_id,
             username=data.get("username"),
             email=data.get("email"),
             password=data.get("password"),
