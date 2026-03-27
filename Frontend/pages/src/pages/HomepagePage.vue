@@ -30,6 +30,27 @@ function safeJsonParse(value, fallback) {
   try { return JSON.parse(value) } catch { return fallback }
 }
 
+function decodeJWT(token) {
+  try {
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(c =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''))
+    return JSON.parse(jsonPayload)
+  } catch (error) {
+    console.error('Error decoding JWT:', error)
+    return null
+  }
+}
+
+function getUserIdFromToken() {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+  const decoded = decodeJWT(token)
+  return decoded?.user_id || null
+}
+
 function parseUnit(raw) {
   const value = String(raw || '').trim().toLowerCase()
   if (!value) return ''
@@ -53,6 +74,26 @@ function unitText(unit) {
   return unit || ''
 }
 
+// Normalize backend product to frontend display format
+function normalizeProduct(product) {
+  return {
+    id: product.id || product._id,
+    type: 'product',
+    name: product.name || 'Продукт',
+    title: product.name || 'Продукт',
+    location: product.location || '',
+    product: product.name || '',
+    category: product.category || '',
+    description: product.description || '',
+    price: Number(product.price) || 0,
+    vendor_id: product.vendor_id || '',
+    unit: '',
+    rating: 4.5,
+    tags: product.category ? [product.category] : [],
+  }
+}
+
+// Keep for backwards compatibility with local offers
 function normalizeOffer(offer) {
   const quantity = parseQuantity(offer.quantity)
   const priceMatch = String(offer.price ?? '').replace(',', '.').match(/-?\d+(?:\.\d+)?/)
@@ -76,18 +117,22 @@ function loadOffers() {
   return Array.isArray(offers) ? offers.map(normalizeOffer) : []
 }
 
-function filterItemsLocal(query) {
-  return [...loadOffers(), ...SEED.items]
-    .filter((item) => !query.product || String(item.product || '').toLowerCase().includes(query.product))
+function filterProducts(products, query) {
+  return products
+    .filter((item) => !query.product || String(item.product || item.name || '').toLowerCase().includes(query.product))
     .filter((item) => !query.location || String(item.location || '').toLowerCase().includes(query.location))
     .filter((item) => !Number.isFinite(query.maxPrice) || Number(item.price) <= query.maxPrice)
 }
 
+function filterItemsLocal(query) {
+  return filterProducts([...loadOffers(), ...SEED.items], query)
+}
+
 function buildSearchParams(query) {
   const params = new URLSearchParams()
-  if (query.product) params.append('product', query.product)
+  if (query.product) params.append('name', query.product)
   if (query.location) params.append('location', query.location)
-  if (query.maxPrice && Number.isFinite(query.maxPrice)) params.append('maxPrice', String(query.maxPrice))
+  if (query.maxPrice && Number.isFinite(query.maxPrice)) params.append('max_price', String(query.maxPrice))
   return params
 }
 
@@ -99,13 +144,40 @@ function parsedQuery() {
   }
 }
 
+async function fetchProducts() {
+  try {
+    const token = localStorage.getItem('token')
+    const response = await fetch('/products', {
+      headers: {
+        'accept': 'application/json',
+        'Authorization': token || '',
+      },
+    })
+    if (!response.ok) throw new Error()
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching products:', error)
+    return []
+  }
+}
+
 async function searchOffers(query) {
   try {
-    const response = await fetch(`/api/offers/search?${buildSearchParams(query).toString()}`)
+    const token = localStorage.getItem('token')
+    const params = buildSearchParams(query)
+    const url = params.toString() ? `/products/filter?${params.toString()}` : '/products'
+
+    const response = await fetch(url, {
+      headers: {
+        'accept': 'application/json',
+        'Authorization': token || '',
+      },
+    })
     if (!response.ok) throw new Error()
-    const offers = await response.json()
-    return offers.map(normalizeOffer)
-  } catch {
+    const products = await response.json()
+    return products.map(normalizeProduct)
+  } catch (error) {
+    console.error('Error searching products:', error)
     return filterItemsLocal(query)
   }
 }
@@ -122,13 +194,22 @@ function saveOfferLocal(offer) {
 }
 
 async function publishOffer(offer) {
-  const response = await fetch('/api/offers', {
+  const token = localStorage.getItem('token')
+  const response = await fetch('/products', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token || ''}`
+    },
     body: JSON.stringify(offer),
   })
 
-  if (!response.ok) throw new Error()
+  if (response.status < 200 || response.status >= 300) {
+    const errorText = await response.text()
+    console.error('Backend error:', response.status, errorText)
+    throw new Error(`Server error: ${response.status}`)
+  }
+
   return response.json()
 }
 
@@ -180,33 +261,48 @@ function resetSearch() {
 async function submitOffer() {
   const product = offerForm.product.trim()
   const price = Number(offerForm.price.trim().replace(',', '.'))
-  const region = offerForm.region.trim()
   const description = offerForm.description.trim()
   const profile = safeJsonParse(localStorage.getItem('mp_profile'), null)
 
   if (!product) return showOfferStatus('Моля, въведи име на продукта.', 'error')
   if (!Number.isFinite(price) || price <= 0) return showOfferStatus('Моля, въведи валидна цена.', 'error')
-  if (!photoDataUrl.value) return showOfferStatus('Моля, качи снимка на продукта.', 'error')
+
+  // Get vendor_id from JWT token
+  const vendorId = getUserIdFromToken()
+  if (!vendorId) {
+    return showOfferStatus('Грешка: липсва потребителска информация. Моля, влезте отново.', 'error')
+  }
 
   isSavingOffer.value = true
 
+  // Backend expects: name, description, price, vendor_id
   const offer = {
-    id: crypto?.randomUUID?.() || String(Date.now()),
-    product,
-    region,
-    price: Number(price.toFixed(2)),
-    description,
-    photoDataUrl: photoDataUrl.value,
-    createdAt: new Date().toISOString(),
-    sellerName: profile?.name || '',
-    sellerEmail: profile?.email || '',
-    sellerPhone: profile?.phone || '',
+    name: product,
+    description: description || product,
+    price: price,
+    vendor_id: vendorId,
   }
 
+  console.log('Sending offer to backend:', offer)
+
   try {
-    await publishOffer(offer)
-    saveOfferLocal(offer)
-  } catch {
+    const result = await publishOffer(offer)
+    console.log('Offer published successfully:', result)
+
+    // Keep local copy with additional fields for backwards compatibility
+    const localOffer = {
+      ...offer,
+      id: result?.id || crypto?.randomUUID?.() || String(Date.now()),
+      product,
+      region: offerForm.region.trim(),
+      createdAt: new Date().toISOString(),
+      sellerName: profile?.name || '',
+      sellerEmail: profile?.email || '',
+      sellerPhone: profile?.phone || '',
+    }
+    saveOfferLocal(localOffer)
+  } catch (error) {
+    console.error('Error publishing offer:', error)
     isSavingOffer.value = false
     return showOfferStatus('Грешка при публикуване на обявата. Моля опитайте отново.', 'error')
   }
@@ -249,7 +345,22 @@ function handlePointerDown(event) {
   if (!event.target.closest('[data-dropdown-root]')) activeDropdown.value = ''
 }
 
-onMounted(() => document.addEventListener('pointerdown', handlePointerDown, true))
+async function loadInitialProducts() {
+  try {
+    const products = await fetchProducts()
+    if (products && products.length > 0) {
+      results.value = products.map(normalizeProduct)
+      hasSearched.value = true
+    }
+  } catch (error) {
+    console.error('Failed to load initial products:', error)
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handlePointerDown, true)
+  loadInitialProducts()
+})
 onBeforeUnmount(() => document.removeEventListener('pointerdown', handlePointerDown, true))
 </script>
 
@@ -315,28 +426,6 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', handlePointerD
       </div>
 
       <form id="offerForm" class="offer-layout" @submit.prevent="submitOffer">
-        <div class="offer-left">
-          <div class="offer-image-wrapper">
-            <label class="offer-image-label" for="offerPhoto">
-              <div id="offerPhotoPlaceholder" class="offer-image-placeholder" :class="{ 'photo-loaded': photoDataUrl }">
-                <span class="upload-icon-big" aria-hidden="true">📷</span>
-                <p class="offer-placeholder-text">Прикачи снимка</p>
-                <span class="btn btn-primary btn-sm">Избери файл</span>
-              </div>
-              <img v-if="photoDataUrl" id="offerPhotoPreview" :src="photoDataUrl" class="offer-image-preview show" alt="Преглед на снимката">
-            </label>
-            <button v-if="photoDataUrl" type="button" id="offerPhotoChange" class="offer-photo-change show" title="Смени снимка" aria-label="Смени снимка" @click="$event.currentTarget.previousElementSibling?.click()">↻</button>
-          </div>
-
-          <input id="offerPhoto" type="file" name="photo" accept="image/*" hidden @change="onPhotoSelected">
-
-          <div class="offer-image-actions">
-            <button id="offerSaveBtn" class="btn btn-accent btn-publish-main" type="submit" :disabled="isSavingOffer">
-              {{ isSavingOffer ? 'Публикуване...' : 'Публикувай обява' }}
-            </button>
-          </div>
-        </div>
-
         <div class="offer-right">
           <div class="offer-fields-row">
             <div class="offer-field">
@@ -362,6 +451,12 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', handlePointerD
           <div class="offer-field">
             <label for="offerDescription">Описание</label>
             <textarea id="offerDescription" v-model="offerForm.description" name="description" class="styled-textarea" placeholder="Разкажи повече за продукта..." rows="3"></textarea>
+          </div>
+
+          <div class="offer-field">
+            <button id="offerSaveBtn" class="btn btn-accent btn-publish-main" type="submit" :disabled="isSavingOffer">
+              {{ isSavingOffer ? 'Публикуване...' : 'Публикувай обява' }}
+            </button>
             <p v-if="offerStatus.message" id="offerStatus" class="form-status show" :class="offerStatus.type === 'success' ? 'form-status-success' : 'form-status-error'" aria-live="polite">
               {{ offerStatus.message }}
             </p>
@@ -381,12 +476,12 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', handlePointerD
       <div id="resultsScroll" class="results-scroll">
         <div v-if="resultsError" class="error-message">{{ resultsError }}</div>
         <div v-else id="resultsGrid" class="grid-layout">
-          <article v-for="(item, index) in results" :key="`${item.type}-${index}`" class="ad-card" :style="{ animationDelay: `${Math.min(index * 60, 260)}ms` }">
-            <div class="ad-image-box">{{ item.product || 'Продукт' }}</div>
+          <article v-for="(item, index) in results" :key="`${item.id || item.type}-${index}`" class="ad-card" :style="{ animationDelay: `${Math.min(index * 60, 260)}ms` }">
+            <div class="ad-image-box">{{ item.name || item.product || 'Продукт' }}</div>
             <div class="ad-details">
               <div class="ad-topline">
-                <h3>{{ item.type === 'farmer' ? item.name : item.title }}</h3>
-                <span class="badge">{{ item.type === 'farmer' ? 'Производител' : 'Обява' }}</span>
+                <h3>{{ item.name || item.title }}</h3>
+                <span class="badge">{{ item.type === 'farmer' ? 'Производител' : item.type === 'product' ? 'Продукт' : 'Обява' }}</span>
               </div>
               <p>{{ item.location || '' }}</p>
               <div class="ad-footer">
@@ -394,8 +489,8 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', handlePointerD
                 <span v-if="item.unit" class="unit-tag">за {{ unitText(item.unit) }}</span>
               </div>
               <div class="meta-row">
-                <span class="meta-chip">Продукт: {{ item.product }}</span>
-                <span v-if="item.quantityLabel" class="meta-chip">Количество: {{ item.quantityLabel }}</span>
+                <span v-if="item.category" class="meta-chip">{{ item.category }}</span>
+                <span v-if="item.description" class="meta-chip">{{ item.description.substring(0, 30) }}{{ item.description.length > 30 ? '...' : '' }}</span>
                 <span class="meta-chip">Рейтинг: {{ Number(item.rating).toFixed(1) }}</span>
                 <span v-for="tag in (item.tags || []).slice(0, 2)" :key="tag" class="meta-chip">{{ tag }}</span>
               </div>
