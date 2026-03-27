@@ -49,3 +49,11 @@ def delete_user(user_id):
     """Delete user from database"""
     result = users_col.delete_one({"_id": ObjectId(user_id)})
     return result.deleted_count > 0
+
+
+def patch_user_profile(user_id, fields):
+    """Update only the provided subset of profile fields"""
+    result = users_col.update_one(
+        {"_id": ObjectId(user_id)}, {"$set": fields}
+    )
+    return result.modified_count > 0

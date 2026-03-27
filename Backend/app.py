@@ -6,12 +6,9 @@ from services.user_service import (
     get_user_service,
     list_users_service,
     create_user_service,
+    patch_user_profile_service,
 )
-from services.status_service import (
-    get_status_service,
-    list_statuses_service,
-    create_status_service,
-)
+from models.status import status as Status, statuses as statuses_col
 from services.vendor_service import (
     list_vendors,
     create_vendor_service,
@@ -158,6 +155,50 @@ def get_user(user_id):
     if not user:
         return jsonify({"error": "User not found"}), 404
     return jsonify(user), 200
+
+
+@app.route("/users/<user_id>", methods=["PATCH"])
+def patch_user(user_id):
+    """
+    Update a user's username, location or phone
+    ---
+    tags:
+      - Users
+    parameters:
+      - in: path
+        name: user_id
+        type: string
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            username:
+              type: string
+            location:
+              type: string
+            phone:
+              type: string
+    responses:
+      200:
+        description: User updated
+      400:
+        description: No valid fields provided
+      404:
+        description: User not found
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    updated, error = patch_user_profile_service(user_id, data)
+    if error:
+        return jsonify({"error": error}), 400
+    if not updated:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"message": "User updated"}), 200
 
 
 # ── Statuses ───────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ from repositories.user_repository import (
     create_user,
     update_user,
     delete_user,
+    patch_user_profile,
 )
 
 
@@ -44,6 +45,15 @@ def update_user_service(user_id, data):
 def delete_user_service(user_id):
     """Service to delete user"""
     return delete_user(user_id)
+
+
+def patch_user_profile_service(user_id, data):
+    allowed = ("username", "location", "phone")
+    fields = {k: v for k, v in data.items() if k in allowed}
+    if not fields:
+        return False, "No valid fields provided"
+    updated = patch_user_profile(user_id, fields)
+    return updated, None
 
 
 def get_user_by_email_service(email):
