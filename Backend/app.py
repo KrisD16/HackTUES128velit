@@ -1,12 +1,17 @@
 from flask import Flask, jsonify, request
 from flasgger import Swagger
+from controllers.auth_controller import auth_bp
 from utils.auth_utils import login_required
 from services.user_service import (
     get_user_service,
     list_users_service,
     create_user_service,
 )
-from models.status import status as Status, statuses as statuses_col
+from services.status_service import (
+    get_status_service,
+    list_statuses_service,
+    create_status_service,
+)
 from services.vendor_service import (
     list_vendors,
     create_vendor_service,
@@ -19,8 +24,10 @@ from services.vendor_service import (
 from bson import ObjectId
 import webbrowser
 import threading
+import os
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "your_secret_key_change_in_production")
 
 swagger_config = {
     "headers": [],
@@ -49,6 +56,8 @@ swagger_template = {
 }
 
 swagger = Swagger(app, config=swagger_config, template=swagger_template)
+
+app.register_blueprint(auth_bp)
 
 
 # ── Users ──────────────────────────────────────────────────────────────────
