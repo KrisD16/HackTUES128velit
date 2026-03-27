@@ -1,2 +1,12 @@
+# Python cache files
 __pycache__/
 *.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+
+# IDE/editor files
+*.vscode/
+*.idea/
+

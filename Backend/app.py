@@ -1,0 +1,587 @@
+from flask import Flask, jsonify, request
+from flasgger import Swagger
+from controllers.auth_controller import auth_bp
+from utils.auth_utils import login_required
+from services.user_service import (
+    get_user_service,
+    list_users_service,
+    create_user_service,
+    patch_user_profile_service,
+)
+from models.status import status as Status, statuses as statuses_col
+from services.vendor_service import (
+    list_vendors,
+    list_products,
+    create_product_service,
+    list_products_for_user,
+    add_product_to_user_service,
+    filter_products_service,
+)
+from bson import ObjectId
+import webbrowser
+import threading
+import os
+
+app = Flask(__name__)
+app.config["SECRET_KEY"] = os.getenv(
+    "SECRET_KEY", "your_secret_key_change_in_production"
+)
+
+swagger_config = {
+    "headers": [],
+    "specs": [
+        {
+            "endpoint": "apispec",
+            "route": "/apispec.json",
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/apidocs/",
+}
+
+swagger_template = {
+    "swagger": "2.0",
+    "info": {
+        "title": "HackTUES 12 API",
+        "description": "API for Users, Statuses and Vendors",
+        "version": "1.0.0",
+    },
+    "basePath": "/",
+    "schemes": ["http"],
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "Enter: Bearer <token>",
+        }
+    },
+}
+
+swagger = Swagger(app, config=swagger_config, template=swagger_template)
+
+app.register_blueprint(auth_bp)
+
+
+# ── Users ──────────────────────────────────────────────────────────────────
+
+
+@app.route("/users", methods=["GET"])
+@login_required
+def get_users():
+    """
+    Get all users
+    ---
+    tags:
+      - Users
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
+    responses:
+      200:
+        description: List of users
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              username:
+                type: string
+              email:
+                type: string
+              created_at:
+                type: string
+              location:
+                type: string
+              phone:
+                type: string
+    """
+    return jsonify(list_users_service()), 200
+
+
+@app.route("/users", methods=["POST"])
+@login_required
+def create_user():
+    """
+    Create a new user
+    ---
+    tags:
+      - Users
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - username
+            - email
+            - password
+          properties:
+            username:
+              type: string
+            email:
+              type: string
+            password:
+              type: string
+            location:
+              type: string
+            phone:
+              type: string
+    responses:
+      201:
+        description: User created
+      400:
+        description: Missing required fields
+    """
+    data = request.get_json()
+    if not data or not all(k in data for k in ("username", "email", "password")):
+        return jsonify({"error": "username, email and password are required"}), 400
+
+    user_id = create_user_service(data)
+    return jsonify({"id": user_id}), 201
+
+
+@app.route("/users/<user_id>", methods=["GET"])
+@login_required
+def get_user(user_id):
+    """
+    Get a user by ID
+    ---
+    tags:
+      - Users
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
+      - in: path
+        name: user_id
+        type: string
+        required: true
+    responses:
+      200:
+        description: User found
+      404:
+        description: User not found
+    """
+    user = get_user_service(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify(user), 200
+
+
+@app.route("/users/<user_id>", methods=["PATCH"])
+@login_required
+def patch_user(user_id):
+    """
+    Update a user's username, location or phone
+    ---
+    tags:
+      - Users
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
+      - in: path
+        name: user_id
+        type: string
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            username:
+              type: string
+            location:
+              type: string
+            phone:
+              type: string
+    responses:
+      200:
+        description: User updated
+      400:
+        description: No valid fields provided
+      404:
+        description: User not found
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    updated, error = patch_user_profile_service(user_id, data)
+    if error:
+        return jsonify({"error": error}), 400
+    if not updated:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"message": "User updated"}), 200
+
+
+# ── Statuses ───────────────────────────────────────────────────────────────
+
+
+@app.route("/statuses", methods=["GET"])
+def get_statuses():
+    """
+    Get all statuses
+    ---
+    tags:
+      - Statuses
+    responses:
+      200:
+        description: List of statuses
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              user:
+                type: string
+                description: Username of the author
+              path:
+                type: string
+                description: Path to the attached file
+              created_at:
+                type: string
+    """
+    docs = list(statuses_col.find())
+    for d in docs:
+        d["_id"] = str(d["_id"])
+        if "created_at" in d and d["created_at"]:
+            d["created_at"] = str(d["created_at"])
+    return jsonify(docs), 200
+
+
+@app.route("/statuses", methods=["POST"])
+def create_status():
+    """
+    Create a new status
+    ---
+    tags:
+      - Statuses
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - user
+            - path
+          properties:
+            user:
+              type: string
+              description: Username of the author
+            path:
+              type: string
+              description: Path to the attached file
+    responses:
+      201:
+        description: Status created
+      400:
+        description: Missing required fields
+    """
+    data = request.get_json()
+    if not data or "path" not in data or "user" not in data:
+        return jsonify({"error": "user and path are required"}), 400
+    result = statuses_col.insert_one(data)
+    return jsonify({"id": str(result.inserted_id)}), 201
+
+
+@app.route("/statuses/<status_id>", methods=["GET"])
+def get_status(status_id):
+    """
+    Get a status by ID
+    ---
+    tags:
+      - Statuses
+    parameters:
+      - in: path
+        name: status_id
+        type: string
+        required: true
+    responses:
+      200:
+        description: Status found
+      404:
+        description: Status not found
+    """
+    doc = statuses_col.find_one({"_id": ObjectId(status_id)})
+    if not doc:
+        return jsonify({"error": "Status not found"}), 404
+    doc["_id"] = str(doc["_id"])
+    if "created_at" in doc and doc["created_at"]:
+        doc["created_at"] = str(doc["created_at"])
+    return jsonify(doc), 200
+
+
+# ── Products ───────────────────────────────────────────────────────────────
+
+
+@app.route("/products", methods=["GET"])
+@login_required
+def get_products():
+    """
+    Get all products
+    ---
+    tags:
+      - Products
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
+    responses:
+      200:
+        description: List of all products
+    """
+    return jsonify(list_products()), 200
+
+
+@app.route("/products", methods=["POST"])
+@login_required
+def create_product():
+    """
+    Create a new product
+    ---
+    tags:
+      - Products
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - vendor_id
+            - name
+            - price
+          properties:
+            vendor_id:
+              type: string
+            name:
+              type: string
+            price:
+              type: number
+            description:
+              type: string
+    responses:
+      201:
+        description: Product created
+      400:
+        description: Missing required fields
+      404:
+        description: Vendor not found
+    """
+    data = request.get_json()
+    if not data or not all(k in data for k in ("vendor_id", "name", "price")):
+        return jsonify({"error": "vendor_id, name and price are required"}), 400
+
+    product_id, error = create_product_service(data)
+    if error:
+        return jsonify({"error": error}), 404
+
+    return jsonify({"id": product_id}), 201
+
+
+# ── Product filtering ──────────────────────────────────────────────────────
+
+
+@app.route("/products/filter", methods=["GET"])
+@login_required
+def get_filtered_products():
+    """
+    Filter products by vendor location, name and max price
+    ---
+    tags:
+      - Products
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
+      - in: query
+        name: location
+        type: string
+        required: false
+        description: Partial vendor location (case-insensitive regex match)
+      - in: query
+        name: name
+        type: string
+        required: false
+        description: Partial product name (case-insensitive regex match)
+      - in: query
+        name: max_price
+        type: number
+        required: false
+        description: Maximum product price (inclusive)
+    responses:
+      200:
+        description: List of matching products
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              vendor_id:
+                type: string
+              name:
+                type: string
+              price:
+                type: number
+              description:
+                type: string
+              category:
+                type: string
+              location:
+                type: string
+      400:
+        description: Invalid max_price value
+    """
+    location = request.args.get("location")
+    name = request.args.get("name")
+    max_price_raw = request.args.get("max_price")
+
+    max_price = None
+    if max_price_raw is not None:
+        try:
+            max_price = float(max_price_raw)
+        except ValueError:
+            return jsonify({"error": "max_price must be a number"}), 400
+
+    products = filter_products_service(
+        location=location, max_price=max_price, name=name
+    )
+    return jsonify(products), 200
+
+
+# ── Vendors ────────────────────────────────────────────────────────────────
+
+
+@app.route("/vendors", methods=["GET"])
+def get_vendors():
+    """
+    Get all vendors
+    ---
+    tags:
+      - Vendors
+    responses:
+      200:
+        description: List of vendors
+    """
+    return jsonify(list_vendors()), 200
+
+
+@app.route("/users/<user_id>/products", methods=["GET"])
+@login_required
+def get_user_products(user_id):
+    """
+    Get all products for a user
+    ---
+    tags:
+      - Products
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
+      - in: path
+        name: user_id
+        type: string
+        required: true
+    responses:
+      200:
+        description: List of products for the user
+    """
+    return jsonify(list_products_for_user(user_id)), 200
+
+
+@app.route("/users/<user_id>/products", methods=["POST"])
+@login_required
+def add_user_product(user_id):
+    """
+    Add a product linked to a user
+    ---
+    tags:
+      - Products
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
+      - in: path
+        name: user_id
+        type: string
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - name
+            - price
+          properties:
+            name:
+              type: string
+            price:
+              type: number
+            description:
+              type: string
+            category:
+              type: string
+    responses:
+      201:
+        description: Product added
+      400:
+        description: Missing required fields
+      404:
+        description: User not found
+    """
+    data = request.get_json()
+    if not data or not all(k in data for k in ("name", "price")):
+        return jsonify({"error": "name and price are required"}), 400
+
+    product_id, error = add_product_to_user_service(user_id, data)
+    if error:
+        return jsonify({"error": error}), 404
+
+    return jsonify({"id": product_id}), 201
+
+
+if __name__ == "__main__":
+    threading.Timer(
+        1.0, lambda: webbrowser.open("http://127.0.0.1:5000/apidocs/")
+    ).start()
+    app.run(debug=False)
