@@ -55,7 +55,6 @@ swagger = Swagger(app, config=swagger_config, template=swagger_template)
 
 
 @app.route("/users", methods=["GET"])
-@login_required
 def get_users():
     """
     Get all users
@@ -87,7 +86,6 @@ def get_users():
 
 
 @app.route("/users", methods=["POST"])
-@login_required
 def create_user():
     """
     Create a new user
@@ -130,7 +128,6 @@ def create_user():
 
 
 @app.route("/users/<user_id>", methods=["GET"])
-@login_required
 def get_user(user_id):
     """
     Get a user by ID
@@ -158,7 +155,6 @@ def get_user(user_id):
 
 
 @app.route("/statuses", methods=["GET"])
-@login_required
 def get_statuses():
     """
     Get all statuses
@@ -193,7 +189,6 @@ def get_statuses():
 
 
 @app.route("/statuses", methods=["POST"])
-@login_required
 def create_status():
     """
     Create a new status
@@ -260,7 +255,6 @@ def get_status(status_id):
 
 
 @app.route("/products", methods=["GET"])
-@login_required
 def get_products():
     """
     Get all products
@@ -275,7 +269,6 @@ def get_products():
 
 
 @app.route("/products", methods=["POST"])
-@login_required
 def create_product():
     """
     Create a new product
@@ -324,7 +317,6 @@ def create_product():
 
 
 @app.route("/products/filter", methods=["GET"])
-@login_required
 def get_filtered_products():
     """
     Filter products by vendor location, name and max price
@@ -393,7 +385,6 @@ def get_filtered_products():
 
 
 @app.route("/vendors", methods=["GET"])
-@login_required
 def get_vendors():
     """
     Get all vendors
@@ -408,7 +399,6 @@ def get_vendors():
 
 
 @app.route("/vendors", methods=["POST"])
-@login_required
 def create_vendor():
     """
     Create a new vendor
@@ -447,7 +437,6 @@ def create_vendor():
 
 
 @app.route("/vendors/<vendor_id>/products", methods=["GET"])
-@login_required
 def get_vendor_products(vendor_id):
     """
     Get all products for a vendor
