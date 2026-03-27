@@ -5,6 +5,9 @@ from bson import ObjectId
 
 
 def register_user(data, db):
+    if not data.get("email") or not data.get("password"):
+        return {"error": "Email and password are required"}
+
     existing_user = db.users.find_one({"email": data["email"]})
 
     if existing_user:
@@ -16,20 +19,35 @@ def register_user(data, db):
         "created_at": datetime.utcnow(),
     }
 
-    result = db.users.insert_one(user)
-
-    return {"message": "User created", "user_id": str(result.inserted_id)}
+    try:
+        result = db.users.insert_one(user)
+        return {
+            "message": "User created successfully",
+            "user_id": str(result.inserted_id),
+        }
+    except Exception as e:
+        return {"error": f"Registration failed: {str(e)}"}
 
 
 def login_user(data, db):
-    user = db.users.find_one({"email": data["email"]})
+    if not data.get("email") or not data.get("password"):
+        return {"error": "Email and password are required"}
 
-    if not user:
-        return {"error": "Invalid credentials"}
+    try:
+        user = db.users.find_one({"email": data["email"]})
 
-    if not check_password(data["password"], user["password"]):
-        return {"error": "Invalid credentials"}
+        if not user:
+            return {"error": "Invalid credentials"}
 
-    token = generate_token(user["_id"])
+        if not check_password(data["password"], user["password"]):
+            return {"error": "Invalid credentials"}
 
-    return {"message": "Login successful", "token": token, "user_id": str(user["_id"])}
+        token = generate_token(user["_id"])
+
+        return {
+            "message": "Login successful",
+            "token": token,
+            "user_id": str(user["_id"]),
+        }
+    except Exception as e:
+        return {"error": f"Login failed: {str(e)}"}

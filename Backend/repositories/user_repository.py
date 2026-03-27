@@ -40,8 +40,7 @@ def create_user(user_obj):
 def update_user(user_id, user_obj):
     """Update user in database"""
     result = users_col.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": user_obj.to_dict()}
+        {"_id": ObjectId(user_id)}, {"$set": user_obj.to_dict()}
     )
     return result.modified_count > 0
 
