@@ -11,11 +11,10 @@ from services.user_service import (
 from models.status import status as Status, statuses as statuses_col
 from services.vendor_service import (
     list_vendors,
-    create_vendor_service,
     list_products,
     create_product_service,
-    list_products_for_vendor,
-    add_product_to_vendor_service,
+    list_products_for_user,
+    add_product_to_user_service,
     filter_products_service,
 )
 from bson import ObjectId
@@ -448,65 +447,35 @@ def get_vendors():
     return jsonify(list_vendors()), 200
 
 
-@app.route("/vendors", methods=["POST"])
-def create_vendor():
+@app.route("/users/<user_id>/products", methods=["GET"])
+def get_user_products(user_id):
     """
-    Create a new vendor
+    Get all products for a user
     ---
     tags:
-      - Vendors
-    parameters:
-      - in: body
-        name: body
-        required: true
-        schema:
-          type: object
-          required:
-            - username
-          properties:
-            username:
-              type: string
-            email:
-              type: string
-            password:
-              type: string
-            location:
-              type: string
-    responses:
-      201:
-        description: Vendor created
-      400:
-        description: Missing required fields
-    """
-    data = request.get_json()
-    if not data or "username" not in data:
-        return jsonify({"error": "username is required"}), 400
-
-    vendor_id = create_vendor_service(data)
-    return jsonify({"id": vendor_id}), 201
-
-
-@app.route("/vendors/<vendor_id>/products", methods=["GET"])
-def get_vendor_products(vendor_id):
-    """
-    Get all products for a vendor
-    ---
-    tags:
-      - Vendors
-    """
-    return jsonify(list_products_for_vendor(vendor_id)), 200
-
-
-@app.route("/vendors/<vendor_id>/products", methods=["POST"])
-def add_vendor_product(vendor_id):
-    """
-    Add a product to a vendor
-    ---
-    tags:
-      - Vendors
+      - Products
     parameters:
       - in: path
-        name: vendor_id
+        name: user_id
+        type: string
+        required: true
+    responses:
+      200:
+        description: List of products for the user
+    """
+    return jsonify(list_products_for_user(user_id)), 200
+
+
+@app.route("/users/<user_id>/products", methods=["POST"])
+def add_user_product(user_id):
+    """
+    Add a product linked to a user
+    ---
+    tags:
+      - Products
+    parameters:
+      - in: path
+        name: user_id
         type: string
         required: true
       - in: body
@@ -524,19 +493,21 @@ def add_vendor_product(vendor_id):
               type: number
             description:
               type: string
+            category:
+              type: string
     responses:
       201:
         description: Product added
       400:
         description: Missing required fields
       404:
-        description: Vendor not found
+        description: User not found
     """
     data = request.get_json()
     if not data or not all(k in data for k in ("name", "price")):
         return jsonify({"error": "name and price are required"}), 400
 
-    product_id, error = add_product_to_vendor_service(vendor_id, data)
+    product_id, error = add_product_to_user_service(user_id, data)
     if error:
         return jsonify({"error": error}), 404
 
