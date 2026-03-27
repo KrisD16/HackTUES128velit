@@ -51,6 +51,14 @@ swagger_template = {
     },
     "basePath": "/",
     "schemes": ["http"],
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "Enter: Bearer <token>",
+        }
+    },
 }
 
 swagger = Swagger(app, config=swagger_config, template=swagger_template)
@@ -62,12 +70,19 @@ app.register_blueprint(auth_bp)
 
 
 @app.route("/users", methods=["GET"])
+@login_required
 def get_users():
     """
     Get all users
     ---
     tags:
       - Users
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
     responses:
       200:
         description: List of users
@@ -93,6 +108,7 @@ def get_users():
 
 
 @app.route("/users", methods=["POST"])
+@login_required
 def create_user():
     """
     Create a new user
@@ -100,6 +116,11 @@ def create_user():
     tags:
       - Users
     parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
       - in: body
         name: body
         required: true
@@ -143,6 +164,11 @@ def get_user(user_id):
     tags:
       - Users
     parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
       - in: path
         name: user_id
         type: string
@@ -160,6 +186,7 @@ def get_user(user_id):
 
 
 @app.route("/users/<user_id>", methods=["PATCH"])
+@login_required
 def patch_user(user_id):
     """
     Update a user's username, location or phone
@@ -167,6 +194,11 @@ def patch_user(user_id):
     tags:
       - Users
     parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
       - in: path
         name: user_id
         type: string
@@ -307,12 +339,19 @@ def get_status(status_id):
 
 
 @app.route("/products", methods=["GET"])
+@login_required
 def get_products():
     """
     Get all products
     ---
     tags:
       - Products
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
     responses:
       200:
         description: List of all products
@@ -321,6 +360,7 @@ def get_products():
 
 
 @app.route("/products", methods=["POST"])
+@login_required
 def create_product():
     """
     Create a new product
@@ -328,6 +368,11 @@ def create_product():
     tags:
       - Products
     parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
       - in: body
         name: body
         required: true
@@ -369,6 +414,7 @@ def create_product():
 
 
 @app.route("/products/filter", methods=["GET"])
+@login_required
 def get_filtered_products():
     """
     Filter products by vendor location, name and max price
@@ -376,6 +422,11 @@ def get_filtered_products():
     tags:
       - Products
     parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
       - in: query
         name: location
         type: string
@@ -451,6 +502,7 @@ def get_vendors():
 
 
 @app.route("/users/<user_id>/products", methods=["GET"])
+@login_required
 def get_user_products(user_id):
     """
     Get all products for a user
@@ -458,6 +510,11 @@ def get_user_products(user_id):
     tags:
       - Products
     parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
       - in: path
         name: user_id
         type: string
@@ -469,8 +526,8 @@ def get_user_products(user_id):
     return jsonify(list_products_for_user(user_id)), 200
 
 
-@login_required
 @app.route("/users/<user_id>/products", methods=["POST"])
+@login_required
 def add_user_product(user_id):
     """
     Add a product linked to a user
@@ -478,6 +535,11 @@ def add_user_product(user_id):
     tags:
       - Products
     parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: "Bearer <token>"
       - in: path
         name: user_id
         type: string
