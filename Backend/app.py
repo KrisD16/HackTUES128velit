@@ -23,7 +23,9 @@ import threading
 import os
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "your_secret_key_change_in_production")
+app.config["SECRET_KEY"] = os.getenv(
+    "SECRET_KEY", "your_secret_key_change_in_production"
+)
 
 swagger_config = {
     "headers": [],
@@ -133,6 +135,7 @@ def create_user():
 
 
 @app.route("/users/<user_id>", methods=["GET"])
+@login_required
 def get_user(user_id):
     """
     Get a user by ID
@@ -466,6 +469,7 @@ def get_user_products(user_id):
     return jsonify(list_products_for_user(user_id)), 200
 
 
+@login_required
 @app.route("/users/<user_id>/products", methods=["POST"])
 def add_user_product(user_id):
     """
