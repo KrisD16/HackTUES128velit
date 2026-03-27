@@ -7,6 +7,52 @@ auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route("/api/auth/register", methods=["POST"])
 def register():
+    """
+    Register a user.
+    ---
+    tags:
+      - auth
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - email
+            - password
+          properties:
+            email:
+              type: string
+              description: User email
+            password:
+              type: string
+              description: User password
+    responses:
+      201:
+        description: User created
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+            user_id:
+              type: string
+      400:
+        description: Bad request or user exists
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Server error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         data = request.json
         if not data or not data.get("email") or not data.get("password"):
@@ -21,6 +67,61 @@ def register():
 
 @auth_bp.route("/api/auth/login", methods=["POST"])
 def login():
+    """
+    Login a user.
+    ---
+    tags:
+      - auth
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - email
+            - password
+          properties:
+            email:
+              type: string
+              description: User email
+            password:
+              type: string
+              description: User password
+    responses:
+      200:
+        description: Login successful
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+            token:
+              type: string
+            user_id:
+              type: string
+      400:
+        description: Bad request
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      401:
+        description: Invalid credentials
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Server error
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         data = request.json
         if not data or not data.get("email") or not data.get("password"):

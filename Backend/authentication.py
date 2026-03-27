@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, redirect
 from flasgger import Swagger
 from controllers.auth_controller import auth_bp
 import os
@@ -14,7 +14,7 @@ app.register_blueprint(auth_bp)
 
 @app.route("/", methods=["GET"])
 def index():
-    return {"message": "Marketplace Backend is running!"}
+    return redirect("/apidocs")
 
 
 @app.errorhandler(404)
