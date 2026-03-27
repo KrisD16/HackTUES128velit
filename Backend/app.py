@@ -13,6 +13,7 @@ from services.vendor_service import (
     create_product_service,
     list_products_for_vendor,
     add_product_to_vendor_service,
+    filter_products_service,
 )
 from bson import ObjectId
 import webbrowser
@@ -311,6 +312,74 @@ def create_product():
     return jsonify({"id": product_id}), 201
 
 
+# ── Product filtering ──────────────────────────────────────────────────────
+
+
+@app.route("/products/filter", methods=["GET"])
+def get_filtered_products():
+    """
+    Filter products by vendor location, name and max price
+    ---
+    tags:
+      - Products
+    parameters:
+      - in: query
+        name: location
+        type: string
+        required: false
+        description: Partial vendor location (case-insensitive regex match)
+      - in: query
+        name: name
+        type: string
+        required: false
+        description: Partial product name (case-insensitive regex match)
+      - in: query
+        name: max_price
+        type: number
+        required: false
+        description: Maximum product price (inclusive)
+    responses:
+      200:
+        description: List of matching products
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              vendor_id:
+                type: string
+              name:
+                type: string
+              price:
+                type: number
+              description:
+                type: string
+              category:
+                type: string
+              location:
+                type: string
+      400:
+        description: Invalid max_price value
+    """
+    location = request.args.get("location")
+    name = request.args.get("name")
+    max_price_raw = request.args.get("max_price")
+
+    max_price = None
+    if max_price_raw is not None:
+        try:
+            max_price = float(max_price_raw)
+        except ValueError:
+            return jsonify({"error": "max_price must be a number"}), 400
+        
+    products = filter_products_service(location=location, max_price=max_price, name=name)
+    return jsonify(products), 200
+
+    
+
+
 # ── Vendors ────────────────────────────────────────────────────────────────
 
 
@@ -349,6 +418,8 @@ def create_vendor():
             email:
               type: string
             password:
+              type: string
+            location:
               type: string
     responses:
       201:

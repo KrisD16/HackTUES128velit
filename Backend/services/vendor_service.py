@@ -7,6 +7,7 @@ from repositories.vendor_repository import (
     create_product,
     get_products_by_vendor,
     add_product_to_vendor,
+    filter_products,
 )
 
 
@@ -58,3 +59,10 @@ def add_product_to_vendor_service(vendor_id, data):
     product_obj = Product.from_dict(data)
     inserted_id = add_product_to_vendor(vendor_obj, product_obj)
     return str(inserted_id), None
+
+
+def filter_products_service(location=None, max_price=None, name=None):
+    return [
+        {**product.to_dict(), "id": str(product._id) if product._id else None}
+        for product in filter_products(location=location, max_price=max_price, name=name)
+    ]

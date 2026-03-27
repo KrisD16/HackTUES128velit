@@ -9,7 +9,7 @@ vendors_col = db["vendors"]
 products_col = db["products"]
 
 
-# Vendor repository
+
 
 
 def get_all_vendors():
@@ -47,3 +47,24 @@ def get_products_by_vendor(vendor_id):
 def add_product_to_vendor(vendor_obj, product_obj):
     product_obj.vendor_id = str(vendor_obj._id)
     return create_product(product_obj)
+
+def filter_products(location=None, max_price=None, name=None):
+          vendor_query = {}
+          if location:
+              vendor_query["location"] = {"$regex": location, "$options": "i"}
+      
+          matching_vendor_ids = [
+              str(v["_id"]) for v in vendors_col.find(vendor_query, {"_id": 1})
+          ]
+      
+          product_query = {"vendor_id": {"$in": matching_vendor_ids}}
+      
+          if name:
+              product_query["name"] = {"$regex": name, "$options": "i"}
+      
+          if max_price is not None:
+              product_query["price"] = {"$lte": max_price}
+      
+      
+          docs = list(products_col.find(product_query))
+          return [Product.from_dict(d) for d in docs]

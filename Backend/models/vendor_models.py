@@ -44,16 +44,18 @@ class Product:
 
 
 class Vendor:
-    def __init__(self, user_id=None, username=None, _id=None):
+    def __init__(self, user_id=None, username=None, location=None, _id=None):
         self._id = _id
         self.user_id = user_id
         self.username = username
+        self.location = location
 
     @classmethod
     def from_dict(cls, data):
         return cls(
             user_id=data.get("user_id"),
             username=data.get("username"),
+            location=data.get("location"),
             _id=data.get("_id"),
         )
 
@@ -61,4 +63,5 @@ class Vendor:
         return {
             "user_id": self.user_id,
             "username": self.username,
+            "location": self.location,
         }
