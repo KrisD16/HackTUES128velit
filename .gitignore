@@ -1,3 +1,11 @@
+# Python cache files
 __pycache__/
 *.py[cod]
-.claude/
+*$py.class
+
+# Virtual environment
+venv/
+
+# IDE/editor files
+*.vscode/
+*.idea/
