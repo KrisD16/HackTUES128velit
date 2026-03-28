@@ -53,7 +53,9 @@ def delete_user(user_id):
 
 def patch_user_profile(user_id, fields):
     """Update only the provided subset of profile fields"""
-    result = users_col.update_one(
-        {"_id": ObjectId(user_id)}, {"$set": fields}
-    )
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        return False
+    result = users_col.update_one({"_id": oid}, {"$set": fields})
     return result.modified_count > 0

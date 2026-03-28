@@ -60,9 +60,9 @@ function normalizeOffer(offer) {
 
   return {
     type: 'offer',
-    title: offer.sellerName ? `Обява от ${offer.sellerName}` : `Обява: ${offer.product || 'Продукт'}`,
+    title: offer.sellerName ? `Обява от ${offer.sellerName}` : `Обява: ${offer.name || offer.product || 'Продукт'}`,
     location: offer.region || '',
-    product: offer.product || '',
+    product: offer.name || offer.product || '',
     price: Number.isFinite(price) ? price : 0,
     unit: quantity.unit || '',
     quantityLabel: offer.quantity || '',
@@ -85,9 +85,9 @@ function filterItemsLocal(query) {
 
 function buildSearchParams(query) {
   const params = new URLSearchParams()
-  if (query.product) params.append('product', query.product)
+  if (query.product) params.append('name', query.product)
   if (query.location) params.append('location', query.location)
-  if (query.maxPrice && Number.isFinite(query.maxPrice)) params.append('maxPrice', String(query.maxPrice))
+  if (query.maxPrice && Number.isFinite(query.maxPrice)) params.append('max_price', String(query.maxPrice))
   return params
 }
 
@@ -101,7 +101,9 @@ function parsedQuery() {
 
 async function searchOffers(query) {
   try {
-    const response = await fetch(`/api/offers/search?${buildSearchParams(query).toString()}`)
+    const response = await fetch(`/products/filter?${buildSearchParams(query).toString()}`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+    })
     if (!response.ok) throw new Error()
     const offers = await response.json()
     return offers.map(normalizeOffer)
@@ -122,10 +124,18 @@ function saveOfferLocal(offer) {
 }
 
 async function publishOffer(offer) {
-  const response = await fetch('/api/offers', {
+  const response = await fetch('/products', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(offer),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+    },
+    body: JSON.stringify({
+      name: offer.product,
+      price: offer.price,
+      description: offer.description,
+      region: offer.region,
+    }),
   })
 
   if (!response.ok) throw new Error()

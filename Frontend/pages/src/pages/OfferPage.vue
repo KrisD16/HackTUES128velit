@@ -36,7 +36,10 @@ function toDataUrl(file) {
 async function publishOffer(offer) {
   const response = await fetch('/api/offers', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+    },
     body: JSON.stringify(offer),
   })
   if (!response.ok) throw new Error()

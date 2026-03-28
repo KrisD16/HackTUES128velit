@@ -13,7 +13,11 @@ function safeJsonParse(value, fallback) {
 
 async function loadProfileFromAPI() {
   try {
-    const response = await fetch('/api/profile')
+    const userId = localStorage.getItem('user_id')
+    if (!userId) return null
+    const response = await fetch(`/users/${userId}`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+    })
     if (!response.ok) throw new Error()
     return await response.json()
   } catch {
@@ -22,9 +26,13 @@ async function loadProfileFromAPI() {
 }
 
 async function saveProfile(profile) {
-  const response = await fetch('/api/profile', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const userId = localStorage.getItem('user_id')
+  const response = await fetch(`/users/${userId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+    },
     body: JSON.stringify(profile),
   })
 
@@ -81,7 +89,7 @@ async function submitProfile() {
   const profile = { name, email, phone, location, image: profileImage.value, updatedAt: new Date().toISOString() }
 
   try {
-    await saveProfile(profile)
+    await saveProfile({ username: name, phone, location })
     localStorage.setItem('mp_profile', JSON.stringify(profile))
     showStatus('Профилът е запазен успешно! ✓', 'success')
     window.setTimeout(() => showStatus('', ''), 3500)

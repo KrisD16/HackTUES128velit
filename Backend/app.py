@@ -399,10 +399,11 @@ def create_product():
       404:
         description: Vendor not found
     """
-    data = request.get_json()
-    if not data or not all(k in data for k in ("vendor_id", "name", "price")):
-        return jsonify({"error": "vendor_id, name and price are required"}), 400
+    data = request.get_json(force=True, silent=True)
+    if not data or not all(k in data for k in ("name", "price")):
+        return jsonify({"error": "name and price are required"}), 400
 
+    data["vendor_id"] = request.user_id
     product_id, error = create_product_service(data)
     if error:
         return jsonify({"error": error}), 404

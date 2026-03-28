@@ -20,6 +20,7 @@ async function submitLogin() {
 
     if (response.ok) {
       if (result.token) localStorage.setItem('token', result.token)
+      if (result.user_id) localStorage.setItem('user_id', result.user_id)
       if (form.email) localStorage.setItem('user_email', form.email)
       await router.push('/')
       return
